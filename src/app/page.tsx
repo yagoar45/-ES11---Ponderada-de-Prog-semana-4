@@ -17,11 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ExclamationTriangleIcon } from "@radix-ui/react-icons"
 
 interface Failure {
   id: string
   datetime: string
-  [key: string]: any
+  data_hora: string
+  [key: string]: string | number | boolean | null
 }
 
 interface Metrics {
@@ -63,7 +66,7 @@ export default function Home() {
           const last24Hours = new Date()
           last24Hours.setDate(last24Hours.getDate() - 1)
 
-          const { count: recentRecords, error: recentError } = await supabase
+          const { count: recentRecords } = await supabase
             .from('curated_intelifalhas')
             .select('*', { count: 'exact', head: true })
             .gte('data_hora', last24Hours.toISOString())
@@ -80,7 +83,6 @@ export default function Home() {
             })
           }
         } catch (err) {
-          console.error('Error caught:', err)
           setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
         } finally {
           setLoading(false)
@@ -128,9 +130,15 @@ export default function Home() {
   )
 
   if (error) return (
-    <div className="flex justify-center items-center min-h-screen">
-      <p className="text-lg text-red-500">Erro: {error}</p>
-    </div>
+    <main className="min-h-screen p-8 bg-gray-50">
+      <Alert variant="destructive" className="max-w-xl mx-auto mt-8">
+        <ExclamationTriangleIcon className="h-4 w-4" />
+        <AlertTitle>Erro ao carregar dados</AlertTitle>
+        <AlertDescription>
+          {error}
+        </AlertDescription>
+      </Alert>
+    </main>
   )
 
   return (
