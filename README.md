@@ -2,6 +2,11 @@
 
 Este projeto consiste em um dashboard simples, desenvolvido com Next.js e Tailwind CSS, para monitorar a telemetria do Data Lake armazenado no banco de dados PostgreSQL do Supabase.
 
+## Versão em Produção
+
+O dashboard está disponível em produção no seguinte endereço:
+[https://dashboard-telemetria-yago.vercel.app/](https://dashboard-telemetria-yago.vercel.app/)
+
 ## Funcionalidades
 
 O dashboard exibe as seguintes métricas em tempo real:
