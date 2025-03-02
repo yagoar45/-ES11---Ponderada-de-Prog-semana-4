@@ -2,15 +2,38 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
-interface Falha {
-  id: number
+interface Failure {
+  id: string
+  datetime: string
   [key: string]: any
 }
 
+interface Metrics {
+  totalRecords: number
+  totalColumns: number
+  last24hRecords: number
+}
+
 export default function Home() {
-  const [falhas, setFalhas] = useState<Falha[]>([])
-  const [colunas, setColunas] = useState<string[]>([])
+  const [failures, setFailures] = useState<Failure[]>([])
+  const [columns, setColumns] = useState<string[]>([])
+  const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -23,28 +46,41 @@ export default function Home() {
     if (mounted) {
       const fetchData = async () => {
         try {
-          console.log('Iniciando conexão com Supabase...')
-          const { data, error } = await supabase
+          const { data: tableData, error: tableError } = await supabase
             .from('curated_intelifalhas')
             .select('*')
+            .order('data_hora', { ascending: false })
             .limit(10)
           
-          if (error) {
-            console.error('Erro ao buscar dados:', error)
-            throw error
-          }
+          if (tableError) throw tableError
 
-          console.log('Dados recebidos:', data)
+          const { count: totalRecords, error: countError } = await supabase
+            .from('curated_intelifalhas')
+            .select('*', { count: 'exact', head: true })
 
-          if (data && data.length > 0) {
-            setFalhas(data)
-            setColunas(Object.keys(data[0]))
-            console.log('Colunas encontradas:', Object.keys(data[0]))
-          } else {
-            console.log('Nenhum dado encontrado na tabela')
+          if (countError) throw countError
+
+          const last24Hours = new Date()
+          last24Hours.setDate(last24Hours.getDate() - 1)
+
+          const { count: recentRecords, error: recentError } = await supabase
+            .from('curated_intelifalhas')
+            .select('*', { count: 'exact', head: true })
+            .gte('data_hora', last24Hours.toISOString())
+
+          if (tableData && tableData.length > 0) {
+            setFailures(tableData)
+            const columnArray = Object.keys(tableData[0])
+            setColumns(columnArray)
+            
+            setMetrics({
+              totalRecords: totalRecords || 0,
+              totalColumns: columnArray.length,
+              last24hRecords: recentRecords || 0
+            })
           }
         } catch (err) {
-          console.error('Erro capturado:', err)
+          console.error('Error caught:', err)
           setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
         } finally {
           setLoading(false)
@@ -55,13 +91,40 @@ export default function Home() {
     }
   }, [mounted])
 
-  // Não renderiza nada até que o componente esteja montado no cliente
   if (!mounted) return null
 
   if (loading) return (
-    <div className="flex justify-center items-center min-h-screen">
-      <p className="text-lg">Carregando...</p>
-    </div>
+    <main className="min-h-screen p-8 bg-gray-50">
+      <div className="text-3xl font-bold mb-8 text-center text-gray-800">
+        <Skeleton className="h-8 w-96 mx-auto" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-4 w-24" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </main>
   )
 
   if (error) return (
@@ -71,41 +134,77 @@ export default function Home() {
   )
 
   return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">
+    <main className="min-h-screen p-8 bg-gray-50">
+      <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">
         Dashboard de Telemetria - Conexão Supabase
       </h1>
 
-      {falhas.length === 0 ? (
-        <div className="text-center text-gray-500">
-          Nenhum dado encontrado
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100">
-                {colunas.map((coluna) => (
-                  <th key={coluna} className="px-6 py-3 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider border-b">
-                    {coluna}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {falhas.map((falha, index) => (
-                <tr key={falha.id || index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                  {colunas.map((coluna) => (
-                    <td key={`${falha.id}-${coluna}`} className="px-6 py-4 text-sm text-gray-500 border-b">
-                      {String(falha[coluna])}
-                    </td>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Total de Registros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">{metrics?.totalRecords || '0'}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Total de Colunas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">{metrics?.totalColumns || '0'}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Registros (24h)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">{metrics?.last24hRecords || '0'}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Últimos Registros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {failures.length === 0 ? (
+            <div className="text-center text-gray-700">
+              Nenhum dado encontrado
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {columns.map((column) => (
+                      <TableHead key={column}>
+                        {column}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {failures.map((failure) => (
+                    <TableRow key={failure.id}>
+                      {columns.map((column) => (
+                        <TableCell key={`${failure.id}-${column}`}>
+                          {String(failure[column] || '-')}
+                        </TableCell>
+                      ))}
+                    </TableRow>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   )
 }
